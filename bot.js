@@ -1,73 +1,90 @@
-const botSettings = require("./botsettings.json")
-const Discord = require("discord.js");
-const fs = require("fs");
-const ytdl = require("ytdl-core");
-const request = require("request");
+const fs = require('fs');
+const Discord = require('discord.js');
+const prefix = ".";
+
 const client = new Discord.Client();
-const prefix = botSettings.prefix;
-const DBL = require("dblapi.js");
-const dbl = new DBL(process.env.dblapi, client);
+client.commands = new Discord.Collection();
 
-const bot = new Discord.Client({disableEveryone: true});
-bot.commands = new Discord.Collection();
-
-fs.readdir("./cmds", (err, files) => {
-    if(err) console.error(err);
-
-    let jsfiles = files.filter(f => f.split(".").pop() === "js");
-    if(jsfiles.length <= 0) {
-        console.log("No commands found to load!");
-        return;
-    }
-
-    console.log(`Loading ${jsfiles.length} commands!`);
-
-    jsfiles.forEach((f, i) => {
-        let props = require(`./cmds/${f}`);
-        console.log(`${i + 1}: ${f} loaded!`);
-        bot.commands.set(props.help.name, props);
-    });
+client.login(process.env.BOT_TOKEN).catch((err) => {
+    process.exit(0);
 });
 
-bot.on("ready", async () => {
-console.log(`Bots is ready and working in ${bot.guilds.size} servers with ${bot.users.size} users!`);
-    
-    dbl.postStats(bot.guilds.size);
- 
-/*setInterval(() => {
-        dbl.postStats(bot.guilds.size);
-    }, 1800000); */
-    
-bot.user.setStatus('Online')
+const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
 
-bot.user.setActivity(`in ${bot.guilds.size} Servers | !help`);
-    
-    bot.channels.get("521378814467506176").setName(`Servers: ${bot.guilds.size}/100`)
-    
+for (const file of commandFiles) {
+	const command = require(`./commands/${file}`);
+	client.commands.set(command.name, command);
+};
 
-try {
-    let link = await bot.generateInvite(["ADMINISTRATOR"]);
-    console.log(link);
-    } catch(e) {
-        console.log(e.stack);
-        }
+//при запуске
+client.on("ready", () => {
+   console.log("Бот запущен!");
+   client.user.setActivity('за всеми учасниками Dairon CHat', { type: 'WATCHING' });
+   const channel = client.channels.cache.get('731779489943519312');
+   channel.send(`Бот запущен!`);
 });
-     
-bot.on("message", async message => {
-    if(message.author.bot) return;
-    if(message.channel.type === "dm") return;  
+
+//запрещенные слова
+let notAllowedWords = new Array("сука", "пидор", "блять", "хуила", "хуй","мудила","шлюха","гей","чсв","бля","ска","cука",
+"сюк","блет","блэт","гавно", "ахуеть","ахуел","чмо","пидр","дебил","даун","заебал","сук","соси","пососи","сосать", "жопа",
+"сюк", "чмошник", "пох", "похуй", "тварь", "лох", "еблан", "хуйня","пидар", "пидарасина");
+
+
+client.on('message', message => {
+
+     //антимат
+    let arrayOfStrings = message.content.toLowerCase().split(' ');
+    for (mat of notAllowedWords) {
+        if (arrayOfStrings.includes(mat)) {
+            message.delete();
+            message.reply("такое говорить запрещено!");
+            return;
+        };
+    };
+
+    //проверка на комманду и т.п.
+    if (!message.content.startsWith(prefix) || message.author.bot || message.channel.type === "dm") return;
+	// const args = message.content.slice(prefix.length).split(' ');
+    // const commandName = args.shift().toLowerCase();
 
     let messageArray = message.content.split(" ");
-    let command = messageArray[0];
+    let commandName = messageArray[0].slice(prefix.length).toLowerCase();
     let args = messageArray.slice(1);
 
-    if(!command.startsWith(prefix)) return;
+    client.channels.cache.get('696433727357845576').send(commandName + " - " + args);
 
-    let cmd = bot.commands.get(command.slice(prefix.length));
-    if(cmd) cmd.run(bot, message, args);
+    //say
+    if (commandName === 'say') {
+        const channel = client.channels.cache.get('696433727357845576');
+        channel.send(args);
+    };
+
+    // if (commandName === 'news') {
+    //     const channel = client.channels.cache.get('666329910591225867');
+	// 	let Embed = new Discord.MessageEmbed()
+	//      .setColor('#fca903')
+	//      .setTitle('Новости')
+    //      .setDescription('**.');
+    //     channel.send(Embed);
+    // };
+
+
+    if (!client.commands.has(commandName)) return;
     
+    const command = client.commands.get(commandName);
+
+    try {
+	    command.execute(message, args);
+    } catch (error) {
+	    console.error(error);
+};
+
 });
 
-bot.login(process.env.token);
-
-//restart
+//new member
+client.on('guildMemberAdd', member => {
+    const channel = client.channels.cache.get('666330099704004649');
+    channel.send(`Здравствуй, ${member}, добро пожаловать на **Dairon Chat**!`);
+    // const stats = client.channels.cache.get('685433983907004550');
+    // client.channels.get("685433983907004550").setName(`Участники:`)
+  });
